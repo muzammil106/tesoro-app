@@ -274,7 +274,7 @@ export class AuthService {
     }
   }
 
-async forgotPassword(payload: ForgotPasswordDto): Promise<any> {
+  async forgotPassword(payload: ForgotPasswordDto): Promise<any> {
     try {
       const { email } = payload;
       const user = await this.findUser(email);
@@ -290,13 +290,13 @@ async forgotPassword(payload: ForgotPasswordDto): Promise<any> {
           otpAttempts: 0,
         },
       );
-      
-      // Send email asynchronously but don't block the response
-      this.emailService.sendOtpEmail(user.email, otp).catch((error) => {
-        console.error('Failed to send OTP email:', error);
-        // Log the error but don't throw to avoid blocking the response
+      setImmediate(() => {
+        try {
+          this.emailService.sendOtpEmail(user.email, otp);
+        } catch (error) {
+          console.log(error);
+        }
       });
-      
       return { message: 'OTP sent to your email' };
     } catch (error) {
       console.log(error);
