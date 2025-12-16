@@ -40,5 +40,4 @@ export const authMessages = {
   LOGIN_SUCCESS: 'Login successful',
   TOKEN_REFRESH_SUCCESS: 'Token refreshed successfully',
   AUTH_SUCCESS: 'Authentication successful.',
-
 };
