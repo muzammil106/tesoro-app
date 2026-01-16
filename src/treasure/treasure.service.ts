@@ -147,7 +147,7 @@ export class TreasureService {
         filter.$or = [
           { title: regex },
           { brand: regex },
-          { type: regex },
+          // { type: regex },
           { itemModel: regex },
           { description: regex },
         ];
@@ -434,7 +434,7 @@ export class TreasureService {
       throw error;
     }
   }
-  
+
   async updateTreasure(payload: UpdateTreasureDto): Promise<any> {
     try {
       const { treasureId, location, category, ...updateFields } = payload;
