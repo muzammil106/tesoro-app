@@ -1,0 +1,83 @@
+name: Deploy Tesoro Backend (NestJS) to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 30m
+          script_stop: false
+          script: |
+            # Exit on errors, verbose mode
+            set -euxo pipefail
+
+            APP_DIR="/var/www/tesoro-backend"
+            REPO_SSH="git@github.com:tesoronft/tesoro-backend.git"
+            BRANCH="main"
+
+            echo "✅ Deploy started..."
+            echo "📁 App Dir: $APP_DIR"
+
+            # Create app dir if missing & set ownership
+            sudo mkdir -p "$APP_DIR"
+            sudo chown -R ${{ secrets.EC2_USER }}:${{ secrets.EC2_USER }} "$APP_DIR"
+            cd "$APP_DIR"
+
+            # Backup .env safely
+            if [ -f ".env" ]; then
+              echo "🔐 .env found, backing up..."
+              cp .env /tmp/tesoro.env.backup
+            fi
+
+            # Clone repo if missing, otherwise pull latest
+            if [ ! -d ".git" ]; then
+              echo "⚠️ No .git found. Fresh clone..."
+              rm -rf "$APP_DIR"/* "$APP_DIR"/.??* 2>/dev/null
+              git clone -b "$BRANCH" "$REPO_SSH" .
+            else
+              echo "✅ Repo exists. Pulling latest code..."
+              git fetch origin
+              git checkout "$BRANCH"
+              git reset --hard "origin/$BRANCH"
+            fi
+
+            # Restore .env
+            if [ -f "/tmp/tesoro.env.backup" ]; then
+              mv /tmp/tesoro.env.backup "$APP_DIR/.env"
+              echo "✅ .env restored"
+            fi
+
+            # Install dependencies optimized for slow networks
+            echo "📦 Installing dependencies..."
+            npm ci --prefer-offline --no-audit --progress=false
+
+            # Build NestJS
+            echo "🏗️ Building NestJS..."
+            npm run build
+
+            # Add PM2 to PATH
+            export PATH=$PATH:/usr/local/bin
+
+            # Zero-downtime restart with PM2
+            echo "🚀 Restarting backend with PM2..."
+            if pm2 describe tesoro-backend >/dev/null 2>&1; then
+              pm2 reload tesoro-backend || pm2 restart tesoro-backend
+            else
+              pm2 start dist/main.js --name tesoro-backend
+            fi
+
+            pm2 save
+            echo "🎉 Deploy completed successfully!"
